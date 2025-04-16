@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kalp Toplama Oyunu</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #87CEEB;
+    }
+    canvas {
+      display: block;
+      background-color: #87CEEB;
+    }
+  </style>
+</head>
+<body>
+  <!-- Görseller internetten alınacak -->
+   <img id="face1" src="assets/fatma1.png" style="display: none;">
+   <img id="face2" src="assets/yunus2.png" style="display: none;">
+  
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const face1 = document.getElementById("face1");
+    const face2 = document.getElementById("face2");
+
+    let score = 0;
+    let level = 1;
+    let levelTransition = false;
+    let loveMessage = "Aşkınız Başladı! <3";
+    let levelMessage = "Seviye Başlıyor!";
+    let loveMessageTimer = 0;
+    let levelMessageTimer = 0;
+    let transitionTimer = 0;
+    const offset = 60;
+    let lives = 3; // Başlangıçta 3 can
+    let invincibilityTime = 0; // Koruma süresi (invincibility) başlatılacak
+
+    let doubleJumpAvailable = true;
+
+    const character1 = {
+      x: 200, y: canvas.height - 200,
+      width: 40, height: 40,
+      velX: 0, velY: 0,
+      speed: 5,
+      jumping: false, grounded: false
+    };
+
+    const character2 = {
+      x: character1.x + 40, y: character1.y, // Yalnızca 40 piksel sağa kaydırdık, bitişik olacak
+      width: 40, height: 40
+    };
+
+    const gravity = 0.5;
+    const friction = 0.8;
+    const jumpStrength = 14;
+
+    let platforms = [];
+    let hearts = [];
+    let obstacles = [];
+
+    function createLevel(level) {
+		  const baseY = canvas.height - 100;
+
+		  platforms = [];
+		  hearts = [];
+		  obstacles = [];
+
+		  const obstacleCount = 4 + (level - 1) * 2; // Engellerin sayısı: İlk seviyede 4, her seviyede 2 artar
+
+		  // Level yapılandırması
+		  switch (level) {
+			case 1:
+			  platforms = [
+				{ x: 0, y: baseY, width: canvas.width, height: 100 },
+				{ x: 200, y: baseY - 100, width: 150, height: 20 },
+				{ x: 400, y: baseY - 180, width: 150, height: 20 },
+				{ x: 650, y: baseY - 250, width: 150, height: 20 },
+				{ x: 900, y: baseY - 180, width: 150, height: 20 },
+				{ x: 1150, y: baseY - 100, width: 150, height: 20 }
+			  ];
+			  hearts = [
+				{ x: 240, y: baseY - 140, collected: false, type: 'normal' },
+				{ x: 460, y: baseY - 220, collected: false, type: 'normal' },
+				{ x: 720, y: baseY - 290, collected: false, type: 'strong' },
+				{ x: 980, y: baseY - 220, collected: false, type: 'normal' },
+				{ x: 1240, y: baseY - 140, collected: false, type: 'strong' }
+			  ];
+			  break;
+
+			case 2:
+			  platforms = [
+				{ x: 0, y: baseY, width: canvas.width, height: 100 },
+				{ x: 100, y: baseY - 120, width: 120, height: 20 },
+				{ x: 350, y: baseY - 200, width: 120, height: 20 },
+				{ x: 600, y: baseY - 280, width: 120, height: 20 },
+				{ x: 850, y: baseY - 200, width: 120, height: 20 },
+				{ x: 1100, y: baseY - 120, width: 120, height: 20 }
+			  ];
+			  hearts = [
+				{ x: 130, y: baseY - 160, collected: false, type: 'normal' },
+				{ x: 370, y: baseY - 240, collected: false, type: 'strong' },
+				{ x: 620, y: baseY - 320, collected: false, type: 'normal' },
+				{ x: 870, y: baseY - 240, collected: false, type: 'strong' }
+			  ];
+			  break;
+
+			case 3:
+			  platforms = [
+				{ x: 0, y: baseY, width: canvas.width, height: 100 },
+				{ x: 150, y: baseY - 120, width: 120, height: 20 },
+				{ x: 400, y: baseY - 200, width: 120, height: 20 },
+				{ x: 650, y: baseY - 280, width: 120, height: 20 },
+				{ x: 900, y: baseY - 200, width: 120, height: 20 },
+				{ x: 1150, y: baseY - 120, width: 120, height: 20 },
+				{ x: 1400, y: baseY - 300, width: 120, height: 20 }
+			  ];
+			  hearts = [
+				{ x: 180, y: baseY - 160, collected: false, type: 'strong' },
+				{ x: 430, y: baseY - 240, collected: false, type: 'normal' },
+				{ x: 680, y: baseY - 320, collected: false, type: 'normal' },
+				{ x: 930, y: baseY - 240, collected: false, type: 'strong' },
+				{ x: 1180, y: baseY - 160, collected: false, type: 'normal' }
+			  ];
+			  break;
+
+			case 4:
+			  platforms = [
+				{ x: 0, y: baseY, width: canvas.width, height: 100 },
+				{ x: 100, y: baseY - 120, width: 120, height: 20 },
+				{ x: 350, y: baseY - 200, width: 120, height: 20 },
+				{ x: 600, y: baseY - 280, width: 120, height: 20 },
+				{ x: 850, y: baseY - 200, width: 120, height: 20 },
+				{ x: 1100, y: baseY - 120, width: 120, height: 20 },
+				{ x: 1350, y: baseY - 320, width: 120, height: 20 },
+				{ x: 1600, y: baseY - 200, width: 120, height: 20 }
+			  ];
+			  hearts = [
+				{ x: 150, y: baseY - 160, collected: false, type: 'strong' },
+				{ x: 400, y: baseY - 240, collected: false, type: 'normal' },
+				{ x: 650, y: baseY - 320, collected: false, type: 'strong' },
+				{ x: 900, y: baseY - 240, collected: false, type: 'normal' },
+				{ x: 1150, y: baseY - 160, collected: false, type: 'normal' },
+				{ x: 1400, y: baseY - 80, collected: false, type: 'strong' }
+			  ];
+			  break;
+
+			case 5:
+			  platforms = [
+				{ x: 0, y: baseY, width: canvas.width, height: 100 },
+				{ x: 50, y: baseY - 100, width: 150, height: 20 },
+				{ x: 250, y: baseY - 200, width: 150, height: 20 },
+				{ x: 500, y: baseY - 300, width: 150, height: 20 },
+				{ x: 750, y: baseY - 200, width: 150, height: 20 },
+				{ x: 1000, y: baseY - 100, width: 150, height: 20 },
+				{ x: 1250, y: baseY - 150, width: 150, height: 20 },
+				{ x: 1500, y: baseY - 250, width: 150, height: 20 },
+				{ x: 1750, y: baseY - 350, width: 150, height: 20 }
+			  ];
+			  hearts = [
+				{ x: 100, y: baseY - 120, collected: false, type: 'strong' },
+				{ x: 300, y: baseY - 220, collected: false, type: 'normal' },
+				{ x: 550, y: baseY - 320, collected: false, type: 'strong' },
+				{ x: 800, y: baseY - 240, collected: false, type: 'normal' },
+				{ x: 1050, y: baseY - 160, collected: false, type: 'normal' },
+				{ x: 1300, y: baseY - 80, collected: false, type: 'strong' },
+				{ x: 1550, y: baseY - 220, collected: false, type: 'normal' }
+			  ];
+			  break;
+		  }
+
+		  // Engel yaratma
+		  for (let i = 0; i < obstacleCount; i++) {
+			const obstacle = {
+			  x: Math.random() * (canvas.width - 30),
+			  y: Math.random() * (canvas.height - 200),
+			  width: 30,
+			  height: 30,
+			  color: 'red'
+			};
+			obstacles.push(obstacle);
+			}
+		}
+
+    createLevel(level);
+
+    let keys = {};
+    window.addEventListener("keydown", e => keys[e.key] = true);
+    window.addEventListener("keyup", e => keys[e.key] = false);
+
+    // Her seviyede gereken puan eşiği
+    const levelThresholds = [50, 120, 205, 275, 295]; // 5 seviyede sırasıyla gereken puanlar
+
+    function checkLevelTransition() {
+      // Seviye geçişi için gerekli olan puanı kontrol ediyoruz
+      if (score >= levelThresholds[level - 1] && level < levelThresholds.length && !levelTransition) {
+        // Seviye atlama
+        level++;
+        levelTransition = true;
+        transitionTimer = 120;
+        levelMessageTimer = 120;
+        loveMessageTimer = 60;
+        loveMessage = "Aşk Seviyeniz Arttı! <3";
+    
+        // Seviye atlama sonrası 1.5 saniye bekleyip yeni seviyeyi oluşturuyoruz
+        setTimeout(() => {
+          createLevel(level);
+          character1.x = 200;
+          character1.y = canvas.height - 200;
+          character1.velX = 0;
+          character1.velY = 0;
+          levelTransition = false;
+          invincibilityTime = 0;
+          keys = {};
+        }, 1500);
+      }
+    }
+
+
+    function updateCharacters() {
+      character1.velY += gravity;
+
+      if ((keys["a"] || keys["ArrowLeft"])) character1.velX -= 0.5;
+      if ((keys["d"] || keys["ArrowRight"])) character1.velX += 0.5;
+
+      if ((keys["w"] || keys["ArrowUp"] || keys[" "])) {
+        if (character1.grounded) {
+          character1.jumping = true;
+          character1.grounded = false;
+          character1.velY = -jumpStrength;
+          doubleJumpAvailable = true;
+        } else if (doubleJumpAvailable) {
+          character1.velY = -jumpStrength;
+          doubleJumpAvailable = false;
+        }
+      }
+
+      if (character1.y > canvas.height - character1.height) {
+        character1.y = canvas.height - character1.height;
+        character1.velY = 0;
+        character1.grounded = true;
+      }
+
+      if (character1.x < 0) character1.x = 0;
+      if (character1.x + character1.width > canvas.width) character1.x = canvas.width - character1.width;
+
+      character1.x += character1.velX;
+      character1.velX *= friction;
+
+      character1.y += character1.velY;
+    }
+
+    function update() {
+      updateCharacters();
+      checkLevelTransition();
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Seviyeleri ve karakterleri çiziyoruz
+      ctx.drawImage(face1, character1.x, character1.y, character1.width, character1.height);
+
+      // Engelleri çiz
+      obstacles.forEach(obstacle => {
+        ctx.fillStyle = obstacle.color;
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+      });
+
+      // Platformları çiz
+      platforms.forEach(platform => {
+        ctx.fillStyle = "brown";
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+      });
+
+      // Kalp öğelerini çiz
+      hearts.forEach(heart => {
+        ctx.fillStyle = heart.type === 'strong' ? "red" : "pink";
+        ctx.beginPath();
+        ctx.arc(heart.x, heart.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Canları yazdır
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText("Canlar: " + lives, 20, 30);
+
+      // Skor ve seviyeyle ilgili mesajları yazdır
+      ctx.fillText("Skor: " + score, 20, 60);
+      ctx.fillText("Seviye: " + level, 20, 90);
+
+      // Seviyenin geçiş mesajı varsa, göster
+      if (levelMessageTimer > 0) {
+        ctx.font = "40px Arial";
+        ctx.fillText(levelMessage, canvas.width / 2 - ctx.measureText(levelMessage).width / 2, canvas.height / 2);
+        levelMessageTimer--;
+      }
+
+      if (loveMessageTimer > 0) {
+        ctx.font = "40px Arial";
+        ctx.fillText(loveMessage, canvas.width / 2 - ctx.measureText(loveMessage).width / 2, canvas.height / 2 + 50);
+        loveMessageTimer--;
+      }
+    }
+
+    function gameLoop() {
+      update();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
